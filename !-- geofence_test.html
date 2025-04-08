@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>현장 지오펜스 테스트</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 90vh; width: 100%; }
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    #status { padding: 10px; text-align: center; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div id="status">위치 확인 중...</div>
+  <div id="map"></div>
+
+  <!-- 라이브러리 로드 -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+
+  <script>
+    // 현장 폴리곤 지오펜스 (경도, 위도 순서)
+    const polygonCoords = [
+      [127.166763, 37.693346],
+      [127.166538, 37.699628],
+      [127.169855, 37.703084],
+      [127.182923, 37.712845],
+      [127.184156, 37.709560],
+      [127.175187, 37.694748],
+      [127.166763, 37.693346]  // 닫힘
+    ];
+
+    // Leaflet에 맞게 (위도, 경도 순서)로 변환
+    const leafletCoords = polygonCoords.map(c => [c[1], c[0]]);
+
+    // 지도 초기화
+    const map = L.map('map').setView(leafletCoords[0], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // 폴리곤 표시
+    const geofencePolygon = L.polygon(leafletCoords, {
+      color: 'blue',
+      fillColor: '#aaf',
+      fillOpacity: 0.3
+    }).addTo(map);
+
+    // 현재 위치 마커
+    const myMarker = L.marker(leafletCoords[0]).addTo(map).bindPopup('현재 위치');
+
+    // Turf.js용 GeoJSON
+    const fenceGeoJSON = {
+      type: "Polygon",
+      coordinates: [polygonCoords]
+    };
+
+    // 위치 추적
+    navigator.geolocation.watchPosition(pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      myMarker.setLatLng([lat, lng]);
+      map.setView([lat, lng]);
+
+      const pt = turf.point([lng, lat]);
+      const poly = turf.polygon(fenceGeoJSON.coordinates);
+      const inside = turf.booleanPointInPolygon(pt, poly);
+
+      const status = document.getElementById("status");
+      status.innerText = inside
+        ? `🟢 지오펜스 안에 있음 (${lat.toFixed(5)}, ${lng.toFixed(5)})`
+        : `🔴 지오펜스 밖 (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+    }, err => {
+      document.getElementById("status").innerText = "위치 정보를 가져올 수 없습니다.";
+    }, {
+      enableHighAccuracy: true
+    });
+  </script>
+</body>
+</html>
