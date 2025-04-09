@@ -14,7 +14,7 @@
   <div id="status">📡 사용자 위치 불러오는 중...</div>
   <div id="map"></div>
 
-  <!-- 지도용 라이브러리 -->
+  <!-- 지도 라이브러리 -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <!-- ✅ Firebase compat 버전 -->
@@ -22,7 +22,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
   <script>
-    // ✅ Firebase 설정
+    // Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyBuA3Md2EB4IpWd1RP_yjzBsrlCuJP7oCQ",
       authDomain: "geofence-demo-af6b4.firebaseapp.com",
@@ -34,6 +34,7 @@
       measurementId: "G-4BJYB0GLVR"
     };
 
+    // 초기화
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -43,21 +44,41 @@
 
     const userMarkers = {};
 
-    // Firebase 위치 실시간 수신
+    // 실시간 사용자 위치 수신
     db.ref('locations').on('value', snapshot => {
       const locations = snapshot.val();
-      document.getElementById("status").innerText = `📍 총 사용자: ${locations ? Object.keys(locations).length : 0}`;
+      const activeUserIds = new Set();
 
-      for (const userId in locations) {
-        const { lat, lng } = locations[userId];
+      if (locations) {
+        document.getElementById("status").innerText = `📍 총 사용자: ${Object.keys(locations).length}`;
+        
+        for (const userId in locations) {
+          const { lat, lng, name, role } = locations[userId];
+          activeUserIds.add(userId);
 
-        if (!userMarkers[userId]) {
-          // 새 사용자 → 마커 생성
-          const marker = L.marker([lat, lng]).addTo(map).bindPopup(`🧍 ${userId}`);
-          userMarkers[userId] = marker;
-        } else {
-          // 기존 사용자 → 위치 업데이트
-          userMarkers[userId].setLatLng([lat, lng]);
+          const popupText = `👤 이름 : ${name || '이름 없음'}\n🛠 역할 : ${role || '역할 없음'}`;
+
+          if (!userMarkers[userId]) {
+            // 새 사용자 마커
+            const marker = L.marker([lat, lng])
+              .addTo(map)
+              .bindPopup(popupText);
+            userMarkers[userId] = marker;
+          } else {
+            // 기존 사용자 위치 갱신
+            userMarkers[userId].setLatLng([lat, lng]);
+            userMarkers[userId].getPopup().setContent(popupText);
+          }
+        }
+      } else {
+        document.getElementById("status").innerText = `📍 총 사용자: 0`;
+      }
+
+      // 👉 사용자 퇴장 시 마커 제거
+      for (const userId in userMarkers) {
+        if (!activeUserIds.has(userId)) {
+          map.removeLayer(userMarkers[userId]);
+          delete userMarkers[userId];
         }
       }
     });
