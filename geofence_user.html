@@ -11,18 +11,18 @@
   </style>
 </head>
 <body>
-  <div id="status">위치 전송 중...</div>
+  <div id="status">위치 전송 대기 중...</div>
   <div id="map"></div>
 
   <!-- 지도용 라이브러리 -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- ✅ Firebase compat 라이브러리 (중요!) -->
+  <!-- Firebase compat 라이브러리 -->
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
   <script>
-    // ✅ Firebase 설정 복사해서 붙여넣기
+    // Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyBuA3Md2EB4IpWd1RP_yjzBsrlCuJP7oCQ",
       authDomain: "geofence-demo-af6b4.firebaseapp.com",
@@ -34,16 +34,22 @@
       measurementId: "G-4BJYB0GLVR"
     };
 
-    // ✅ Firebase 초기화 (compat 모드)
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // 사용자 입력 받기
+    const name = prompt("이름을 입력하세요");         // 예: 김재윤
+    const role = prompt("역할을 입력하세요");         // 예: 철근공
+    const userId = name + "_" + Math.floor(Math.random() * 10000);  // ex: 김재윤_2371
+    const userRef = db.ref('locations/' + userId);
+
+    // 나가면 자동 삭제
+    userRef.onDisconnect().remove();
 
     // 지도 초기화
     const map = L.map('map').setView([37.6933, 127.1667], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     const myMarker = L.marker([37.6933, 127.1667]).addTo(map).bindPopup('내 위치');
-
-    const userId = 'user_' + Math.floor(Math.random() * 10000);
 
     // 위치 추적
     navigator.geolocation.watchPosition(pos => {
@@ -54,10 +60,12 @@
       map.setView([lat, lng]);
 
       document.getElementById("status").innerText =
-        `📡 위치 전송 중: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        `📡 ${name} (${role}) 위치 전송 중: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
-      // Firebase에 위치 저장
-      db.ref('locations/' + userId).set({
+      // Firebase에 위치 + 이름 + 역할 저장
+      userRef.set({
+        name,
+        role,
         lat,
         lng,
         timestamp: Date.now()
