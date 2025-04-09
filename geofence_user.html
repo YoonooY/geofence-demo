@@ -17,25 +17,25 @@
   <!-- 지도용 라이브러리 -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- Firebase 라이브러리 -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+  <!-- ✅ Firebase compat 라이브러리 (중요!) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
   <script>
-    // 🔧 복사한 Firebase 설정 붙여넣기
+    // ✅ Firebase 설정 복사해서 붙여넣기
     const firebaseConfig = {
       apiKey: "AIzaSyBuA3Md2EB4IpWd1RP_yjzBsrlCuJP7oCQ",
       authDomain: "geofence-demo-af6b4.firebaseapp.com",
       databaseURL: "https://geofence-demo-af6b4-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "geofence-demo-af6b4",
-      storageBucket: "geofence-demo-af6b4.firebasestorage.app",
+      storageBucket: "geofence-demo-af6b4.appspot.com",
       messagingSenderId: "1055340054679",
       appId: "1:1055340054679:web:b619d1651717691bd281d2",
       measurementId: "G-4BJYB0GLVR"
     };
 
-    // Firebase 초기화
-    const app = firebase.initializeApp(firebaseConfig);
+    // ✅ Firebase 초기화 (compat 모드)
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     // 지도 초기화
@@ -43,7 +43,6 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     const myMarker = L.marker([37.6933, 127.1667]).addTo(map).bindPopup('내 위치');
 
-    // 사용자 ID (간단히 브라우저 랜덤 UUID 사용)
     const userId = 'user_' + Math.floor(Math.random() * 10000);
 
     // 위치 추적
@@ -66,6 +65,7 @@
 
     }, err => {
       document.getElementById("status").innerText = "❌ 위치 정보를 가져올 수 없습니다.";
+      console.error(err);
     }, {
       enableHighAccuracy: true
     });
