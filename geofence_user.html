@@ -60,7 +60,7 @@
       map.setView([lat, lng]);
 
       document.getElementById("status").innerText =
-        `📡 ${name} (${role}) 위치 전송 중: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        `📡 ${name} (${role}) Geofence Demo: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
       // Firebase에 위치 + 이름 + 역할 저장
       userRef.set({
