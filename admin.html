@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>관리자 위치 모니터링</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map { height: 90vh; width: 100%; }
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    #status { padding: 10px; font-weight: bold; text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="status">📡 사용자 위치 로딩 중...</div>
+  <div id="map"></div>
+
+  <!-- 지도용 라이브러리 -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Firebase 라이브러리 -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+
+  <script>
+    // Firebase 설정 복사
+    const firebaseConfig = {
+      apiKey: "AIzaSyBuA3Md2EB4IpWd1RP_yjzBsrlCuJP7oCQ",
+      authDomain: "geofence-demo-af6b4.firebaseapp.com",
+      databaseURL: "https://geofence-demo-af6b4-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "geofence-demo-af6b4",
+      storageBucket: "geofence-demo-af6b4.firebasestorage.app",
+      messagingSenderId: "1055340054679",
+      appId: "1:1055340054679:web:b619d1651717691bd281d2",
+      measurementId: "G-4BJYB0GLVR"
+    };
+
+    // Firebase 초기화
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // 지도 초기화
+    const map = L.map('map').setView([37.6933, 127.1667], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    const userMarkers = {}; // 사용자 ID별 마커 저장
+
+    // 사용자 위치 실시간 감시
+    db.ref('locations').on('value', snapshot => {
+      const data = snapshot.val();
+      document.getElementById("status").innerText = `🟢 사용자 ${Object.keys(data).length}명 위치 수신 중`;
+
+      for (let userId in data) {
+        const { lat, lng } = data[userId];
+
+        if (userMarkers[userId]) {
+          // 기존 마커 이동
+          userMarkers[userId].setLatLng([lat, lng]);
+        } else {
+          // 새 마커 생성
+          const marker = L.marker([lat, lng]).addTo(map).bindPopup(`👤 ${userId}`);
+          userMarkers[userId] = marker;
+        }
+      }
+    });
+  </script>
+</body>
+</html>
