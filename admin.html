@@ -1,32 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>관리자 위치 확인 페이지</title>
+  <title>관리자 위치 확인</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    #map { height: 85vh; width: 100%; }
-    body { font-family: sans-serif; margin: 0; padding: 0; }
-    #status, #toggleFilter {
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+    #map {
+      flex: 1;
+    }
+    #sidebar {
+      width: 300px;
+      background: #f9f9f9;
+      border-left: 1px solid #ccc;
       padding: 10px;
-      text-align: center;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    #status {
       font-weight: bold;
-      display: block;
+      margin-bottom: 10px;
     }
     #toggleFilter {
+      padding: 8px;
+      margin-bottom: 10px;
       background-color: #ddd;
       border: none;
-      cursor: pointer;
-      margin: 10px auto;
       border-radius: 5px;
+      cursor: pointer;
+    }
+    #userList {
+      flex: 1;
+      overflow-y: auto;
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
+    }
+    .user {
+      padding: 6px;
+      border-bottom: 1px solid #eee;
+    }
+    .user.inside {
+      background-color: #e0ffe0;
+    }
+    .user.outside {
+      background-color: #ffe0e0;
     }
   </style>
 </head>
 <body>
-  <div id="status">📡 사용자 위치 불러오는 중...</div>
-  <button id="toggleFilter">👀 지오펜스 내 사용자만 보기</button>
-  <div id="map"></div>
+  <div id="container">
+    <div id="map"></div>
+    <div id="sidebar">
+      <div id="status">📡 사용자 위치 불러오는 중...</div>
+      <button id="toggleFilter">👀 지오펜스 내 사용자만 보기</button>
+      <div id="userList"></div>
+    </div>
+  </div>
 
+  <!-- 라이브러리 -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -49,7 +90,7 @@
     const map = L.map('map').setView([37.6933, 127.1667], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // 지오펜스 정의
+    // 지오펜스 좌표
     const polygonCoords = [
       [127.166763, 37.693346],
       [127.166538, 37.699628],
@@ -62,7 +103,6 @@
     const leafletCoords = polygonCoords.map(c => [c[1], c[0]]);
     const fenceGeoJSON = { type: "Polygon", coordinates: [polygonCoords] };
 
-    // 지도에 지오펜스 폴리곤 표시
     L.polygon(leafletCoords, {
       color: 'blue',
       fillColor: '#aaf',
@@ -75,27 +115,29 @@
       return turf.booleanPointInPolygon(pt, poly);
     }
 
-    const userMarkers = {};
     let filterEnabled = false;
+    const userMarkers = {};
 
-    // 버튼 클릭 이벤트
     document.getElementById("toggleFilter").addEventListener("click", () => {
       filterEnabled = !filterEnabled;
       document.getElementById("toggleFilter").innerText =
         filterEnabled ? "🌍 전체 사용자 보기" : "👀 지오펜스 내 사용자만 보기";
-      updateMarkers(); // 필터 적용
+      updateMarkers();
     });
 
     function updateMarkers() {
       db.ref('locations').once('value').then(snapshot => {
         const locations = snapshot.val();
+        const userListEl = document.getElementById("userList");
         const activeUserIds = new Set();
 
-        // 기존 마커 제거
-        for (const userId in userMarkers) {
-          map.removeLayer(userMarkers[userId]);
+        // 마커 제거
+        for (const id in userMarkers) {
+          map.removeLayer(userMarkers[id]);
         }
         Object.keys(userMarkers).forEach(id => delete userMarkers[id]);
+
+        userListEl.innerHTML = "";
 
         if (locations) {
           for (const userId in locations) {
@@ -103,19 +145,24 @@
             const inside = checkInsideGeofence(lat, lng);
             if (filterEnabled && !inside) continue;
 
-            const popupText = `👤 이름 : ${name || '이름 없음'}\n🛠 역할 : ${role || '역할 없음'}\n📍 위치: ${inside ? '🟢 안' : '🔴 밖'}`;
+            const popupText = `👤 이름 : ${name}\n🛠 역할 : ${role}\n📍 위치: ${inside ? '🟢 안' : '🔴 밖'}`;
             const marker = L.marker([lat, lng]).addTo(map).bindPopup(popupText);
             userMarkers[userId] = marker;
             activeUserIds.add(userId);
+
+            const userDiv = document.createElement("div");
+            userDiv.className = `user ${inside ? 'inside' : 'outside'}`;
+            userDiv.innerHTML = `👤 <strong>${name}</strong><br>🛠 ${role}`;
+            userListEl.appendChild(userDiv);
           }
-          document.getElementById("status").innerText = `👤 표시 중: ${activeUserIds.size}명`;
+
+          document.getElementById("status").innerText = `👥 표시 중: ${activeUserIds.size}명`;
         } else {
           document.getElementById("status").innerText = "📍 사용자 없음";
         }
       });
     }
 
-    // 실시간 업데이트 → updateMarkers 호출
     db.ref('locations').on('value', () => {
       updateMarkers();
     });
