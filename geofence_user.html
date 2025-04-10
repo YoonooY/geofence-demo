@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>"Geofence Test"</title>
+  <title>사용자 위치 전송</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
@@ -14,15 +14,14 @@
   <div id="status">위치 전송 대기 중...</div>
   <div id="map"></div>
 
-  <!-- 지도용 라이브러리 -->
+  <!-- 지도/라이브러리 -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Firebase compat 라이브러리 -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
   <script>
-    // Firebase 설정
+    // 🔧 Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyBuA3Md2EB4IpWd1RP_yjzBsrlCuJP7oCQ",
       authDomain: "geofence-demo-af6b4.firebaseapp.com",
@@ -30,20 +29,16 @@
       projectId: "geofence-demo-af6b4",
       storageBucket: "geofence-demo-af6b4.appspot.com",
       messagingSenderId: "1055340054679",
-      appId: "1:1055340054679:web:b619d1651717691bd281d2",
-      measurementId: "G-4BJYB0GLVR"
+      appId: "1:1055340054679:web:b619d1651717691bd281d2"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 사용자 입력 받기
-    const name = prompt("이름을 입력하세요");         // 예: 김재윤
-    const role = prompt("역할을 입력하세요");         // 예: 철근공
-    const userId = name + "_" + Math.floor(Math.random() * 10000);  // ex: 김재윤_2371
+    // 사용자 정보
+    const name = prompt("이름을 입력하세요");          // 예: 김재윤
+    const role = prompt("역할을 입력하세요");          // 예: 굴삭기 기사
+    const userId = name + "_" + Math.floor(Math.random() * 10000);  // ex: 김재윤_1234
     const userRef = db.ref('locations/' + userId);
-
-    // 나가면 자동 삭제
     userRef.onDisconnect().remove();
 
     // 지도 초기화
@@ -51,18 +46,46 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     const myMarker = L.marker([37.6933, 127.1667]).addTo(map).bindPopup('내 위치');
 
-    // 위치 추적
+    // 📌 지오펜스 설정 (Polygon 좌표)
+    const polygonCoords = [
+      [127.166763, 37.693346],
+      [127.166538, 37.699628],
+      [127.169855, 37.703084],
+      [127.182923, 37.712845],
+      [127.184156, 37.709560],
+      [127.175187, 37.694748],
+      [127.166763, 37.693346]
+    ];
+    const leafletCoords = polygonCoords.map(c => [c[1], c[0]]);
+    const fenceGeoJSON = { type: "Polygon", coordinates: [polygonCoords] };
+
+    // 지도에 지오펜스 폴리곤 표시
+    L.polygon(leafletCoords, {
+      color: 'blue',
+      fillColor: '#aaf',
+      fillOpacity: 0.3
+    }).addTo(map);
+
+    // Turf.js로 지오펜스 판별 함수
+    function checkInsideGeofence(lat, lng) {
+      const pt = turf.point([lng, lat]);
+      const poly = turf.polygon(fenceGeoJSON.coordinates);
+      return turf.booleanPointInPolygon(pt, poly);
+    }
+
+    // 위치 추적 및 전송
     navigator.geolocation.watchPosition(pos => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
+
+      const inside = checkInsideGeofence(lat, lng);
 
       myMarker.setLatLng([lat, lng]);
       map.setView([lat, lng]);
 
       document.getElementById("status").innerText =
-        `📡 ${name} (${role}) Geofence Demo: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        `📡 ${name} (${role}) 위치 전송 중: ${lat.toFixed(5)}, ${lng.toFixed(5)}\n${inside ? '🟢 지오펜스 안' : '🔴 지오펜스 밖'}`;
 
-      // Firebase에 위치 + 이름 + 역할 저장
       userRef.set({
         name,
         role,

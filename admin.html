@@ -5,19 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    #map { height: 90vh; width: 100%; }
+    #map { height: 85vh; width: 100%; }
     body { font-family: sans-serif; margin: 0; padding: 0; }
-    #status { padding: 10px; text-align: center; font-weight: bold; }
+    #status, #toggleFilter {
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+      display: block;
+    }
+    #toggleFilter {
+      background-color: #ddd;
+      border: none;
+      cursor: pointer;
+      margin: 10px auto;
+      border-radius: 5px;
+    }
   </style>
 </head>
 <body>
   <div id="status">📡 사용자 위치 불러오는 중...</div>
+  <button id="toggleFilter">👀 지오펜스 내 사용자만 보기</button>
   <div id="map"></div>
 
-  <!-- 지도 라이브러리 -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- ✅ Firebase compat 버전 -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
 
@@ -30,57 +41,83 @@
       projectId: "geofence-demo-af6b4",
       storageBucket: "geofence-demo-af6b4.appspot.com",
       messagingSenderId: "1055340054679",
-      appId: "1:1055340054679:web:b619d1651717691bd281d2",
-      measurementId: "G-4BJYB0GLVR"
+      appId: "1:1055340054679:web:b619d1651717691bd281d2"
     };
-
-    // 초기화
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 지도 초기화
     const map = L.map('map').setView([37.6933, 127.1667], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+    // 지오펜스 정의
+    const polygonCoords = [
+      [127.166763, 37.693346],
+      [127.166538, 37.699628],
+      [127.169855, 37.703084],
+      [127.182923, 37.712845],
+      [127.184156, 37.709560],
+      [127.175187, 37.694748],
+      [127.166763, 37.693346]
+    ];
+    const leafletCoords = polygonCoords.map(c => [c[1], c[0]]);
+    const fenceGeoJSON = { type: "Polygon", coordinates: [polygonCoords] };
+
+    // 지도에 지오펜스 폴리곤 표시
+    L.polygon(leafletCoords, {
+      color: 'blue',
+      fillColor: '#aaf',
+      fillOpacity: 0.3
+    }).addTo(map);
+
+    function checkInsideGeofence(lat, lng) {
+      const pt = turf.point([lng, lat]);
+      const poly = turf.polygon(fenceGeoJSON.coordinates);
+      return turf.booleanPointInPolygon(pt, poly);
+    }
+
     const userMarkers = {};
+    let filterEnabled = false;
 
-    // 실시간 사용자 위치 수신
-    db.ref('locations').on('value', snapshot => {
-      const locations = snapshot.val();
-      const activeUserIds = new Set();
+    // 버튼 클릭 이벤트
+    document.getElementById("toggleFilter").addEventListener("click", () => {
+      filterEnabled = !filterEnabled;
+      document.getElementById("toggleFilter").innerText =
+        filterEnabled ? "🌍 전체 사용자 보기" : "👀 지오펜스 내 사용자만 보기";
+      updateMarkers(); // 필터 적용
+    });
 
-      if (locations) {
-        document.getElementById("status").innerText = `📍 총 사용자: ${Object.keys(locations).length}`;
-        
-        for (const userId in locations) {
-          const { lat, lng, name, role } = locations[userId];
-          activeUserIds.add(userId);
+    function updateMarkers() {
+      db.ref('locations').once('value').then(snapshot => {
+        const locations = snapshot.val();
+        const activeUserIds = new Set();
 
-          const popupText = `👤 이름 : ${name || '이름 없음'}\n🛠 역할 : ${role || '역할 없음'}`;
-
-          if (!userMarkers[userId]) {
-            // 새 사용자 마커
-            const marker = L.marker([lat, lng])
-              .addTo(map)
-              .bindPopup(popupText);
-            userMarkers[userId] = marker;
-          } else {
-            // 기존 사용자 위치 갱신
-            userMarkers[userId].setLatLng([lat, lng]);
-            userMarkers[userId].getPopup().setContent(popupText);
-          }
-        }
-      } else {
-        document.getElementById("status").innerText = `📍 총 사용자: 0`;
-      }
-
-      // 👉 사용자 퇴장 시 마커 제거
-      for (const userId in userMarkers) {
-        if (!activeUserIds.has(userId)) {
+        // 기존 마커 제거
+        for (const userId in userMarkers) {
           map.removeLayer(userMarkers[userId]);
-          delete userMarkers[userId];
         }
-      }
+        Object.keys(userMarkers).forEach(id => delete userMarkers[id]);
+
+        if (locations) {
+          for (const userId in locations) {
+            const { lat, lng, name, role } = locations[userId];
+            const inside = checkInsideGeofence(lat, lng);
+            if (filterEnabled && !inside) continue;
+
+            const popupText = `👤 이름 : ${name || '이름 없음'}\n🛠 역할 : ${role || '역할 없음'}\n📍 위치: ${inside ? '🟢 안' : '🔴 밖'}`;
+            const marker = L.marker([lat, lng]).addTo(map).bindPopup(popupText);
+            userMarkers[userId] = marker;
+            activeUserIds.add(userId);
+          }
+          document.getElementById("status").innerText = `👤 표시 중: ${activeUserIds.size}명`;
+        } else {
+          document.getElementById("status").innerText = "📍 사용자 없음";
+        }
+      });
+    }
+
+    // 실시간 업데이트 → updateMarkers 호출
+    db.ref('locations').on('value', () => {
+      updateMarkers();
     });
   </script>
 </body>
