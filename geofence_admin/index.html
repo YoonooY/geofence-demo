@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>지오펜스 관리자</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="geofence_admin/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+  <div id="container">
+    <div id="map"></div>
+    <div id="resizableSidebar">
+      <div id="dragHandle"></div>
+      <div id="toggleButton">⇤</div>
+      <div id="status">📡 사용자 위치 불러오는 중...</div>
+      <button id="toggleFilter">👀 지오펜스 내 사용자만 보기</button>
+      <div id="userList">⏳ 사용자 리스트 로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- 스크립트 -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <script src="geofence_admin/script.js"></script>
+</body>
+</html>
